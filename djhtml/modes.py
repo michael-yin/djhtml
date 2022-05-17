@@ -252,6 +252,25 @@ class DjHTML(DjTXT):
         "wbr",
     ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.clean_before_tokenize()
+
+    def clean_before_tokenize(self):
+        import uuid
+        data_action_map = {}
+        src = self.source
+
+        def clean(match):
+            key = str(uuid.uuid4())
+            data_action_map[key] = match.group()
+            return f'data-action="{key}"'
+
+        pattern = r'data-action=\"(.+?)\"'
+        clean_source = re.sub(pattern, clean, src)
+        self.source = clean_source
+        self.data_action_map = data_action_map
+
     def create_token(self, raw_token, src):
         kind = "html"
         self.next_mode = self
@@ -281,6 +300,20 @@ class DjHTML(DjTXT):
             return Token.Close(raw_token, kind)
 
         return super().create_token(raw_token, src)
+
+    def indent(self, *args):
+        result = super().indent(*args)
+
+        data_action_map = self.data_action_map
+
+        def revert(match):
+            key = match.groups()[0]
+            value = data_action_map[key]
+            return f'{value}'
+
+        pattern = r'data-action=\"(.+?)\"'
+        final_result = re.sub(pattern, revert, result)
+        return final_result
 
 
 class DjCSS(DjTXT):
